@@ -3,11 +3,12 @@ import pandas as pd
 import joblib
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import GroupShuffleSplit
 from sklearn.svm import SVC
 from tqdm import tqdm
 
 from load_data import load_all_datasets
-from emotion_recognition.src.utils.extract_features import extract_features
+from extract_features import extract_features
 
 
 def main():
@@ -31,9 +32,12 @@ def main():
     y_encoded = label_encoder.fit_transform(y)
 
     print("\n Splitting dataset (train/test)...")
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y_encoded, test_size=0.2, stratify=y_encoded, random_state=42
-    )
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    train_idx, test_idx = next(gss.split(X, y_encoded, groups=df))
+
+    X_train, X_test = X[train_idx], X[test_idx]
+    y_train, y_test = y_encoded[train_idx], y_encoded[test_idx]
+
 
     print("\n Scaling features...")
     scaler = StandardScaler()

@@ -3,7 +3,7 @@ import numpy as np
 import joblib
 import librosa
 
-from emotion_recognition.src.utils.extract_features import extract_features
+from extract_features import extract_features
 
 model = joblib.load("/models/svm_model.pkl")
 scaler = joblib.load("/models/scaler.pkl")

@@ -7,7 +7,7 @@ from sklearn.svm import SVC
 from tqdm import tqdm
 
 from load_data import load_ravdess
-from emotion_recognition.src.utils.extract_features import extract_features
+from extract_features import extract_features
 
 
 def main():
@@ -64,9 +64,9 @@ def main():
 
     print("\nSaving model files into /models ...")
 
-    joblib.dump(best_model, "models/svm_model.pkl")
-    joblib.dump(scaler, "models/scaler.pkl")
-    joblib.dump(label_encoder, "models/label_encoder.pkl")
+    joblib.dump(best_model, "models/svm_model_ravdess.pkl")
+    joblib.dump(scaler, "models/scaler_ravdess.pkl")
+    joblib.dump(label_encoder, "models/label_encoder_ravdess.pkl")
 
     print("\nDONE! Model, scaler, and label encoder saved successfully.")
 

@@ -18,9 +18,9 @@ def main():
 
     X = np.array(X)
 
-    model = joblib.load("models/svm_model.pkl")
-    scaler = joblib.load("models/scaler.pkl")
-    encoder = joblib.load("models/label_encoder.pkl")
+    model = joblib.load("models/svm_model_ravdess.pkl")
+    scaler = joblib.load("models/scaler_ravdess.pkl")
+    encoder = joblib.load("models/label_encoder_ravdess.pkl")
 
     y_enc = encoder.transform(y)
 
