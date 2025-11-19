@@ -1,9 +1,7 @@
 import numpy as np
-import pandas as pd
 import joblib
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.model_selection import GroupShuffleSplit
+from sklearn.model_selection import GroupShuffleSplit, GridSearchCV
 from sklearn.svm import SVC
 from tqdm import tqdm
 
@@ -20,24 +18,26 @@ def main():
 
     X = []
     y = []
+    groups = []
 
-    for i, row in tqdm(df.iterrows(), total=len(df)):
+    for _, row in tqdm(df.iterrows(), total=len(df)):
         features = extract_features(row["path"])
         X.append(features)
         y.append(row["emotion"])
+        groups.append(f"{row['dataset']}_{row['actor']}")
 
     X = np.array(X)
+    groups = np.array(groups)
 
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
 
-    print("\n Splitting dataset (train/test)...")
+    print("\n Splitting dataset (train/test) with GroupShuffleSplit...")
     gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-    train_idx, test_idx = next(gss.split(X, y_encoded, groups=df))
+    train_idx, test_idx = next(gss.split(X, y_encoded, groups=groups))
 
     X_train, X_test = X[train_idx], X[test_idx]
     y_train, y_test = y_encoded[train_idx], y_encoded[test_idx]
-
 
     print("\n Scaling features...")
     scaler = StandardScaler()
@@ -48,7 +48,7 @@ def main():
     params = {
         "C": [0.1, 1, 10, 100, 1000],
         "gamma": ["scale", "auto", 0.1, 0.01, 0.001],
-        "kernel": ["rbf"]
+        "kernel": ["rbf"],
     }
 
     svc = SVC(class_weight="balanced")
@@ -56,9 +56,9 @@ def main():
     grid = GridSearchCV(
         svc,
         params,
-        cv=3,
+        cv=3,          
         n_jobs=-1,
-        verbose=1
+        verbose=1,
     )
 
     grid.fit(X_train, y_train)

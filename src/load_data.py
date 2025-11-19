@@ -10,8 +10,9 @@ ravdess_emotions = {
     "05": "angry",
     "06": "fearful",
     "07": "disgust",
-    "08": "surprised"
+    "08": "surprised",
 }
+
 
 def load_ravdess(base_path):
     audio_files = glob.glob(os.path.join(base_path, "**/*.wav"), recursive=True)
@@ -38,8 +39,9 @@ cremad_emotions = {
     "ANG": "angry",
     "FEAR": "fearful",
     "DIS": "disgust",
-    "NEU": "neutral"
+    "NEU": "neutral",
 }
+
 
 def load_cremad(base_path):
     audio_files = glob.glob(os.path.join(base_path, "*.wav"))
@@ -48,7 +50,7 @@ def load_cremad(base_path):
 
     for file in audio_files:
         file_name = os.path.basename(file)
-        
+
         parts = file_name.split("_")
         actor_id = parts[0]
         emotion_code = parts[2].split(".")[0]
@@ -60,11 +62,99 @@ def load_cremad(base_path):
     df = pd.DataFrame(data, columns=["path", "emotion", "actor", "dataset"])
     return df
 
-def load_all_datasets():
-    ravdess_df = load_ravdess("./data/ravdess")
-    cremad_df = load_cremad("./data/cremad/AudioWAV")
 
-    df = pd.concat([ravdess_df, cremad_df], ignore_index=True)
+tess_emotions = {
+    "angry": "angry",
+    "disgust": "disgust",
+    "fear": "fearful",
+    "happy": "happy",
+    "neutral": "neutral",
+    "pleasant_surprise": "surprised",
+    "pleasant_surprised": "surprised",
+    "sad": "sad",
+}
+
+
+def load_tess(base_path):
+    audio_files = glob.glob(os.path.join(base_path, "**/*.wav"), recursive=True)
+
+    data = []
+
+    for file in audio_files:
+        parent = os.path.basename(os.path.dirname(file))
+        parts = parent.split("_", 1)
+
+        actor_id = parts[0]
+
+        if len(parts) > 1:
+            emotion_key = parts[1].lower()
+        else:
+            emotion_key = ""
+
+        emotion = tess_emotions.get(emotion_key)
+
+        data.append([file, emotion, actor_id, "TESS"])
+
+    df = pd.DataFrame(data, columns=["path", "emotion", "actor", "dataset"])
+    return df
+
+savee_emotions = {
+    "a": "angry",
+    "d": "disgust",
+    "f": "fearful",
+    "h": "happy",
+    "n": "neutral",
+    "sa": "sad",
+    "su": "surprised",
+}
+
+
+def load_savee(base_path):
+    audio_files = glob.glob(os.path.join(base_path, "*.wav"))
+
+    data = []
+
+    for file in audio_files:
+        file_name = os.path.basename(file)
+        name_no_ext = os.path.splitext(file_name)[0]
+
+        parts = name_no_ext.split("_")
+        actor_id = parts[0]
+
+        if len(parts) > 1:
+            emo_part = parts[1]
+        else:
+            emo_part = ""
+
+        emotion_code = "".join(ch for ch in emo_part if ch.isalpha())
+        emotion = savee_emotions.get(emotion_code)
+
+        data.append([file, emotion, actor_id, "SAVEE"])
+
+    df = pd.DataFrame(data, columns=["path", "emotion", "actor", "dataset"])
+    return df
+
+
+
+def load_all_datasets():
+    dfs = []
+
+    if os.path.isdir("./data/ravdess"):
+        dfs.append(load_ravdess("./data/ravdess"))
+
+    if os.path.isdir("./data/cremad/AudioWAV"):
+        dfs.append(load_cremad("./data/cremad/AudioWAV"))
+
+    if os.path.isdir("./data/tess"):
+        dfs.append(load_tess("./data/tess"))
+
+    if os.path.isdir("./data/savee"):
+        dfs.append(load_savee("./data/savee"))
+
+    if not dfs:
+        return pd.DataFrame(columns=["path", "emotion", "actor", "dataset"])
+
+    df = pd.concat(dfs, ignore_index=True)
     df = df.dropna(subset=["emotion"])
     return df
 
@@ -74,6 +164,7 @@ def main():
     print("Ukupno audio zapisa učitano:", len(df))
     print(df["dataset"].value_counts())
     print(df.head())
+
+
 if __name__ == "__main__":
     main()
-
