@@ -12,8 +12,8 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 
 sys.path.append("src")
 
-from src.extract_features import extract_features
-from src.load_data import load_all_datasets, load_ravdess
+from emotion_recognition.src.shared.extract_features import extract_features
+from emotion_recognition.src.shared.load_data import load_all_datasets, load_ravdess
 
 
 MODEL_CONFIG = {
