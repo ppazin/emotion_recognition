@@ -2,49 +2,39 @@ import os
 import sys
 import tempfile
 
-import numpy as np
 import streamlit as st
 import joblib
-import pandas as pd
-
-from sklearn.model_selection import GroupShuffleSplit
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 sys.path.append("src")
-
-from emotion_recognition.src.shared.extract_features import extract_features
-from emotion_recognition.src.shared.load_data import load_all_datasets, load_ravdess
+from src.shared.extract_features import extract_features
 
 
-MODEL_CONFIG = {
-    "combined": {
-        "label": "SVM – RAVDESS + CREMA-D (8 emocija)",
-        "model_path": "models/svm_model.pkl",
-        "scaler_path": "models/scaler.pkl",
-        "encoder_path": "models/label_encoder.pkl",
-        "dataset": "all",
-    },
-    "ravdess": {
-        "label": "SVM – samo RAVDESS",
-        "model_path": "models/svm_model_ravdess.pkl",
-        "scaler_path": "models/scaler_ravdess.pkl",
-        "encoder_path": "models/label_encoder_ravdess.pkl",
-        "dataset": "ravdess",
-    },
+MODEL_PATH = "models/all-rf/model.pkl"
+SCALER_PATH = "models/all-rf/scaler.pkl"
+ENCODER_PATH = "models/all-rf/label_encoder.pkl"
+
+# Map model labels -> nicer text + color (no emojis)
+EMOTION_STYLES = {
+    "neutral":   {"label": "Neutralno",   "color": "#8c8c8c"},
+    "calm":      {"label": "Smireno",    "color": "#52c41a"},
+    "happy":     {"label": "Sretno",     "color": "#faad14"},
+    "sad":       {"label": "Tužno",      "color": "#40a9ff"},
+    "angry":     {"label": "Ljutito",    "color": "#ff4d4f"},
+    "fearful":   {"label": "Uplašeno",   "color": "#722ed1"},
+    "disgust":   {"label": "Gadljivo",   "color": "#13c2c2"},
+    "surprised": {"label": "Iznenađeno", "color": "#eb2f96"},
 }
 
 
 @st.cache_resource
-def load_model(model_key: str):
-    cfg = MODEL_CONFIG[model_key]
-    model = joblib.load(cfg["model_path"])
-    scaler = joblib.load(cfg["scaler_path"])
-    label_encoder = joblib.load(cfg["encoder_path"])
+def load_model():
+    model = joblib.load(MODEL_PATH)
+    scaler = joblib.load(SCALER_PATH)
+    label_encoder = joblib.load(ENCODER_PATH)
     return model, scaler, label_encoder
 
 
-
-def predict_emotion_from_file(file_bytes: bytes, filename: str, model_key: str):
+def predict_emotion_from_file(file_bytes: bytes, filename: str) -> str:
     _, ext = os.path.splitext(filename)
     if ext == "":
         ext = ".wav"
@@ -55,7 +45,7 @@ def predict_emotion_from_file(file_bytes: bytes, filename: str, model_key: str):
 
     try:
         features = extract_features(tmp_path)
-        model, scaler, encoder = load_model(model_key)
+        model, scaler, encoder = load_model()
         features_scaled = scaler.transform([features])
         y_pred = model.predict(features_scaled)
         emotion = encoder.inverse_transform(y_pred)[0]
@@ -66,208 +56,228 @@ def predict_emotion_from_file(file_bytes: bytes, filename: str, model_key: str):
     return emotion
 
 
-
-@st.cache_data(show_spinner=False)
-def evaluate_model(model_key: str):
-    cfg = MODEL_CONFIG[model_key]
-    model, scaler, encoder = load_model(model_key)
-
-    if cfg["dataset"] == "ravdess":
-        df = load_ravdess("./data/ravdess")
-    else:
-        df = load_all_datasets()
-
-    X = []
-    y = []
-    groups = []
-
-    for _, row in df.iterrows():
-        X.append(extract_features(row["path"]))
-        y.append(row["emotion"])
-        groups.append(f"{row['dataset']}_{row['actor']}")
-
-    X = np.array(X)
-    y_enc = encoder.transform(y)
-
-    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-    train_idx, test_idx = next(gss.split(X, y_enc, groups=groups))
-
-    X_test = X[test_idx]
-    y_test = y_enc[test_idx]
-
-    X_test_scaled = scaler.transform(X_test)
-
-    y_pred = model.predict(X_test_scaled)
-
-    acc = accuracy_score(y_test, y_pred)
-    report = classification_report(
-        y_test, y_pred, target_names=encoder.classes_
-    )
-    cm = confusion_matrix(y_test, y_pred)
-    cm_df = pd.DataFrame(cm, index=encoder.classes_, columns=encoder.classes_)
-
-    return acc, report, cm_df
-
-
-
-def init_session_state():
-    if "messages" not in st.session_state:
-        st.session_state["messages"] = []
-
-
-def add_message(role, text):
-    st.session_state["messages"].append({"role": role, "text": text})
-
-
-
-def render_chat_page(model_key: str):
-    st.subheader("Razgovor")
-
-    for msg in st.session_state["messages"]:
-        if msg["role"] == "user":
-            with st.chat_message("user"):
-                st.write(msg["text"])
-        else:
-            with st.chat_message("assistant"):
-                st.write(msg["text"])
-
-    st.divider()
-    st.subheader("Pošalji novi audio")
-
-    uploaded_file = st.file_uploader(
-        "Odaberi audio datoteku (wav/mp3/ogg/flac)...",
-        type=["wav", "mp3", "ogg", "flac"],
-    )
-
-    user_note = st.text_input(
-        "Opcionalna poruka uz audio (npr. što govoriš ili kako se osjećaš):",
-        value="",
-        placeholder="Npr. 'pričam veselo na engleskom'...",
-    )
-
-    analyze_clicked = st.button("Analiziraj")
-
-    if analyze_clicked:
-        if uploaded_file is None:
-            st.warning("Najprije uploadaj audio datoteku.")
-        else:
-            user_msg_text = f"📎 Poslao sam audio: **{uploaded_file.name}**"
-            if user_note.strip():
-                user_msg_text += f"\n\n Napomena: {user_note}"
-
-            add_message("user", user_msg_text)
-
-            with st.spinner("Analiziram emociju iz glasa..."):
-                file_bytes = uploaded_file.read()
-                try:
-                    predicted_emotion = predict_emotion_from_file(
-                        file_bytes, uploaded_file.name, model_key
-                    )
-                    bot_text = f"Prepoznata emocija: **{predicted_emotion}**"
-                except Exception as e:
-                    bot_text = f"Greška pri obradi audio datoteke: `{e}`"
-            add_message("assistant", bot_text)
-
-            st.rerun()
-
-
-def render_info_page(model_key: str):
-    cfg = MODEL_CONFIG[model_key]
-
-    st.subheader("Informacije o sustavu")
-
+def render_global_styles():
     st.markdown(
-        f"""
-    ### Trenutno odabrani model
-
-    **{cfg['label']}**
-
-    - Klasični strojno-učeći model (SVM)
-    - Ručno dizajnirane značajke:
-    - MFCC, delta, delta-delta  
-    - Chroma  
-    - RMS (energija)  
-    - Spectral contrast  
-    - Trening skup:
-    - `{cfg['dataset']}` (ovisno o modelu, npr. samo RAVDESS ili RAVDESS+CREMA-D)
-
-    ---
-
-    ### Napomena
-
-    - Model je treniran na **engl. govoru glumaca**, u kontroliranim uvjetima.
-    - Za **hrvatski** i svakodnevni govor rezultati će biti slabiji – to je odličan primjer ograničenja
-    klasičnih ML metoda i domenskog prijenosa.
-    - U radu možeš ovo iskoristiti za:
-    - usporedbu različitih datasetova,
-    - usporedbu različitih modela,
-    - diskusiju o generalizaciji na nove govornike.
-    """
-    )
-
-
-def render_eval_page(model_key: str):
-    cfg = MODEL_CONFIG[model_key]
-    st.subheader("Evaluacija modela")
-
-    st.markdown(
-        f"""
-        Ovdje možeš pokrenuti evaluaciju za trenutno odabrani model:
-
-        **{cfg['label']}**
-
-        Evaluacija koristi:
-        - **GroupShuffleSplit** (govornik-nezavisna podjela)
-        - **test_size = 0.2**
-        - metrika: *accuracy*, *precision/recall/F1* po klasi i matrica zabune.
         """
-        )
+        <style>
+        .stApp {
+            background: radial-gradient(circle at top left, #1f2933 0, #0b1015 55%, #02040a 100%);
+            color: #f5f5f5;
+        }
 
-    if st.button("Pokreni evaluaciju"):
-        with st.spinner("Izračunavam metrike, ovo može potrajati..."):
-            acc, report, cm_df = evaluate_model(model_key)
+        h1, h2, h3, h4 {
+            letter-spacing: 0.03em;
+        }
 
-        st.success(f"Gotovo! Accuracy: **{acc:.3f}**")
+        .app-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
 
-        st.markdown("#### Classification report")
-        st.text(report)
+        .app-title {
+            margin-bottom: 0.2rem;
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
 
-        st.markdown("#### Confusion matrix")
-        st.dataframe(cm_df)
+        .app-subtitle {
+            color: #a3a3a3;
+            font-size: 0.95rem;
+            margin: 0;
+        }
 
+        .card {
+            border-radius: 14px;
+            padding: 1.25rem 1.5rem;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            backdrop-filter: blur(10px);
+        }
+
+        .card-subtle {
+            border-radius: 14px;
+            padding: 1.25rem 1.4rem;
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            backdrop-filter: blur(8px);
+            margin-bottom: 1rem;
+        }
+
+        div[data-testid="stFileUploader"] > section {
+            border-radius: 14px !important;
+            border: 1px dashed rgba(148, 163, 184, 0.6) !important;
+            background-color: rgba(15, 23, 42, 0.55) !important;
+            padding: 1.4rem 1.6rem !important;
+        }
+
+        div[data-testid="stFileUploader"] label {
+            font-size: 0.9rem;
+            color: #cbd5f5 !important;
+        }
+
+        .result-header {
+            font-size: 0.9rem;
+            color: #9ca3af;
+            margin-bottom: 0.15rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .result-emotion {
+            font-size: 1.7rem;
+            font-weight: 600;
+        }
+
+        .emotion-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.65rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: 0.45rem;
+        }
+
+        /* Small section title on left */
+        .section-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def main():
-    st.set_page_config(page_title="Pamonia")
-    st.title("Pamonia – Prepoznavanje emocija iz glasa")
+    st.set_page_config(
+        page_title="Pamonia – Emocije iz glasa",
+        layout="wide",
+    )
 
-    init_session_state()
+    render_global_styles()
 
-    with st.sidebar:
-        st.header("Navigacija")
+    st.markdown(
+        """
+        <div class="app-header">
+            <div class="app-title">Pamonia</div>
+            <p class="app-subtitle">
+                Prepoznavanje emocija iz glasa pomoću klasičnih modela strojnog učenja (Random Forest + XGBoost)
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-        page = st.radio(
-            "Odaberi sekciju:",
-            ["Chat", "Info", "Evaluacija"],
+    col_left, col_right = st.columns([1.25, 1])
+
+    with col_left:
+        st.markdown("### Učitaj audio")
+
+        st.markdown(
+            """
+            <div class="card-subtle">
+                <p style="font-size: 0.9rem; color: #e5e7eb; margin-bottom: 0.4rem;">
+                    Ispusti audio datoteku unutar ovog područja ili klikni za odabir.
+                </p>
+                <p style="font-size: 0.8rem; color: #9ca3af; margin-bottom: 0;">
+                    Podržani formati: <code>wav</code>, <code>mp3</code>, <code>ogg</code>, <code>flac</code>
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-        st.markdown("---")
-        st.subheader("Model")
-
-        model_key = st.selectbox(
-            "Odaberi model:",
-            options=list(MODEL_CONFIG.keys()),
-            format_func=lambda k: MODEL_CONFIG[k]["label"],
+        uploaded_file = st.file_uploader(
+            "Ispusti audio datoteku ovdje ili klikni za odabir",
+            type=["wav", "mp3", "ogg", "flac"],
+            label_visibility="collapsed",
         )
 
+        if uploaded_file is not None:
+            with st.spinner("Analiziram emociju iz glasa..."):
+                try:
+                    file_bytes = uploaded_file.read()
+                    emotion_raw = predict_emotion_from_file(file_bytes, uploaded_file.name)
+                    emotion_key = str(emotion_raw).lower()
+                    style = EMOTION_STYLES.get(emotion_key)
 
-    if page == "Chat":
-        render_chat_page(model_key)
-    elif page == "Info":
-        render_info_page(model_key)
-    elif page == "Evaluacija":
-        render_eval_page(model_key)
+                    st.success("Analiza završena.")
 
+                    if style:
+                        label = style["label"]
+                        color = style["color"]
+
+                        st.markdown(
+                            f"""
+                            <div class="card" style="margin-top: 0.9rem;">
+                                <div class="result-header">Prepoznata emocija</div>
+                                <div class="result-emotion">{label}</div>
+                                <div class="emotion-pill" style="border: 1px solid {color}; color: {color};">
+                                    {emotion_raw}
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown(
+                            f"""
+                            <div class="card" style="margin-top: 0.9rem;">
+                                <div class="result-header">Prepoznata emocija</div>
+                                <div class="result-emotion">{emotion_raw}</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
+                except Exception as e:
+                    st.error(f"Greška pri obradi audio datoteke: `{e}`")
+        else:
+            st.info("Još nije učitan nijedan audio. Ispusti datoteku ili klikni za odabir.")
+
+    with col_right:
+        st.markdown("### Informacije o modelu")
+
+        st.markdown(
+            """
+            <div class="card">
+                <p style="margin-bottom: 0.6rem;">
+                    <strong>Model</strong>
+                </p>
+                <ul style="margin-top: 0; padding-left: 1.1rem; font-size: 0.9rem;">
+                    <li>Korištene metode strojnog učenja: Random Forest + XGBoost</li>
+                    <li>Analizirane značajke:
+                        <ul style="margin-top: 0.25rem; padding-left: 1.1rem;">
+                            <li>MFCC, delta, delta-delta</li>
+                            <li>Chroma</li>
+                            <li>RMS (energija)</li>
+                            <li>Spectral contrast</li>
+                        </ul>
+                    </li>
+                </ul>
+                <p style="margin-bottom: 0.4rem; margin-top: 0.9rem;">
+                    <strong>Datasetovi</strong>
+                </p>
+                <ul style="margin-top: 0; padding-left: 1.1rem; font-size: 0.9rem;">
+                    <li>RAVDESS</li>
+                    <li>TESS</li>
+                    <li>CREMA-D</li>
+                    <li>SAVEE</li>
+                </ul>
+                <p style="margin-bottom: 0.4rem; margin-top: 0.9rem;">
+                    <strong>Napomene</strong>
+                </p>
+                <ul style="margin-top: 0; padding-left: 1.1rem; font-size: 0.9rem; color: #d1d5db;">
+                    <li>Model je treniran na glumcima i snimkama na engleskom jeziku.</li>
+                </ul>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 if __name__ == "__main__":
     main()

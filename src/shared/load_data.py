@@ -34,23 +34,7 @@ def load_ravdess(base_path):
         data.append([file, emotion, actor_id, "RAVDESS"])
 
     return pd.DataFrame(data, columns=["path", "emotion", "actor", "dataset"])
-    audio_files = glob.glob(os.path.join(base_path, "**/*.wav"), recursive=True)
 
-    data = []
-
-    for file in audio_files:
-        file_name = os.path.basename(file)
-        parts = file_name.split("-")
-
-        emotion_id = parts[2]
-        actor_id = parts[-1].split(".")[0]
-
-        emotion = ravdess_emotions.get(emotion_id)
-
-        data.append([file, emotion, actor_id, "RAVDESS"])
-
-    df = pd.DataFrame(data, columns=["path", "emotion", "actor", "dataset"])
-    return df
 
 cremad_emotions = {
     "HAP": "happy",

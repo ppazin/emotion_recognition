@@ -2,8 +2,8 @@ import numpy as np
 import joblib
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import GroupShuffleSplit
-from emotion_recognition.src.shared.load_data import load_all_datasets
-from emotion_recognition.src.shared.extract_features import extract_features
+from src.shared.load_data import load_all_datasets
+from src.shared.extract_features import extract_features
 
 def main():
     print("Loading data...")
@@ -20,9 +20,9 @@ def main():
 
     X = np.array(X)
 
-    model = joblib.load("models/svm_model.pkl")
-    scaler = joblib.load("models/scaler.pkl")
-    encoder = joblib.load("models/label_encoder.pkl")
+    model = joblib.load("models/all-svm/svm_model.pkl")
+    scaler = joblib.load("models/all-svm/scaler.pkl")
+    encoder = joblib.load("models/all-svm/label_encoder.pkl")
 
     y_enc = encoder.transform(y)
 
