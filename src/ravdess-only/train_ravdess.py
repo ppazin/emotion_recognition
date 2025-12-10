@@ -5,8 +5,8 @@ from sklearn.model_selection import GroupShuffleSplit, GridSearchCV
 from sklearn.svm import SVC
 from tqdm import tqdm
 
-from emotion_recognition.src.shared.load_data import load_ravdess
-from emotion_recognition.src.shared.extract_features import extract_features
+from src.shared.load_data import load_ravdess
+from src.shared.extract_features import extract_features
 
 
 def main():
@@ -14,7 +14,7 @@ def main():
     df = load_ravdess("./data/ravdess")
     print("Total samples:", len(df))
 
-    print("\n Extracting features (MFCC + others)... this may take a few minutes")
+    print("\nExtracting features (MFCC + others)... this may take a few minutes")
 
     X = []
     y = []
@@ -29,22 +29,26 @@ def main():
     X = np.array(X)
     groups = np.array(groups)
 
+    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
 
-    print("\n Splitting dataset (train/test) with GroupShuffleSplit (speaker independent)...")
+    print("\nSplitting dataset (train/test) with GroupShuffleSplit (speaker independent)...")
     gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
     train_idx, test_idx = next(gss.split(X, y_encoded, groups=groups))
 
     X_train, X_test = X[train_idx], X[test_idx]
     y_train, y_test = y_encoded[train_idx], y_encoded[test_idx]
 
-    print("\n Scaling features...")
+    print("\nScaling features...")
     scaler = StandardScaler()
+
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    print("\n Training SVM with GridSearchCV...")
+    print("\nTraining SVM with GridSearchCV...")
+
     params = {
         "C": [0.1, 1, 10, 100, 1000],
         "gamma": ["scale", "auto", 0.1, 0.01, 0.001],
@@ -59,6 +63,7 @@ def main():
         cv=3,
         n_jobs=-1,
         verbose=1,
+        error_score="raise"
     )
 
     grid.fit(X_train, y_train)
@@ -68,9 +73,9 @@ def main():
 
     print("\nSaving model files into /models ...")
 
-    joblib.dump(best_model, "models/ravdess-svm/svm_model_ravdess.pkl")
-    joblib.dump(scaler, "models/ravdess-svm/scaler_ravdess.pkl")
-    joblib.dump(label_encoder, "models/ravdess-svm/label_encoder_ravdess.pkl")
+    joblib.dump(best_model, "models/ravdess/svm_model_ravdess.pkl")
+    joblib.dump(scaler, "models/ravdess/scaler_ravdess.pkl")
+    joblib.dump(label_encoder, "models/ravdess/label_encoder_ravdess.pkl")
 
     print("\nDONE! Model, scaler, and label encoder saved successfully.")
 

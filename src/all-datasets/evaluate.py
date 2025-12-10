@@ -1,17 +1,33 @@
 import numpy as np
 import joblib
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    precision_score,
+    recall_score,
+    f1_score
+)
 from sklearn.model_selection import GroupShuffleSplit
+
 from src.shared.load_data import load_all_datasets
 from src.shared.extract_features import extract_features
 
-def main():
-    print("Loading data...")
-    df = load_all_datasets()
 
-    X = []
-    y = []
-    groups = []
+def print_section(title: str):
+    print("\n" + "=" * 60)
+    print(title)
+    print("=" * 60 + "\n")
+
+
+def main():
+
+    print_section("STEP 1 — Loading Dataset")
+    df = load_all_datasets()
+    print(f"Total samples: {len(df)}")
+
+    print_section("STEP 2 — Extracting Features")
+    X, y, groups = [], [], []
 
     for _, row in df.iterrows():
         X.append(extract_features(row["path"]))
@@ -19,28 +35,53 @@ def main():
         groups.append(f"{row['dataset']}_{row['actor']}")
 
     X = np.array(X)
+    groups = np.array(groups)
 
-    model = joblib.load("models/all-svm/svm_model.pkl")
-    scaler = joblib.load("models/all-svm/scaler.pkl")
-    encoder = joblib.load("models/all-svm/label_encoder.pkl")
+    print_section("STEP 3 — Loading Model, Scaler and Encoder")
+    model = joblib.load("models/all/model.pkl")
+    scaler = joblib.load("models/all/scaler.pkl")
+    encoder = joblib.load("models/all/label_encoder.pkl")
 
-    y_enc = encoder.transform(y)
+    y_encoded = encoder.transform(y)
 
-    print("Group-wise split...")
-    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-    train_idx, test_idx = next(gss.split(X, y_enc, groups=groups))
+    print_section("STEP 4 — Speaker-Independent Test Split")
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.20, random_state=42)
+    train_idx, test_idx = next(gss.split(X, y_encoded, groups=groups))
 
     X_test = X[test_idx]
-    y_test = y_enc[test_idx]
+    y_test = y_encoded[test_idx]
 
     X_test_scaled = scaler.transform(X_test)
 
-    print("Predicting...")
+    print_section("STEP 5 — Predicting on Test Set")
     y_pred = model.predict(X_test_scaled)
 
-    print("\nAccuracy:", accuracy_score(y_test, y_pred))
-    print("\nClassification report:\n", classification_report(y_test, y_pred))
-    print("\nConfusion matrix:\n", confusion_matrix(y_test, y_pred))
+    print_section("STEP 6 — Evaluation Metrics")
+
+    accuracy = accuracy_score(y_test, y_pred)
+    precision_macro = precision_score(y_test, y_pred, average="macro", zero_division=0)
+    recall_macro = recall_score(y_test, y_pred, average="macro", zero_division=0)
+    f1_macro = f1_score(y_test, y_pred, average="macro", zero_division=0)
+
+    precision_weighted = precision_score(y_test, y_pred, average="weighted", zero_division=0)
+    recall_weighted = recall_score(y_test, y_pred, average="weighted", zero_division=0)
+    f1_weighted = f1_score(y_test, y_pred, average="weighted", zero_division=0)
+
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"Precision (Macro):   {precision_macro:.4f}")
+    print(f"Recall (Macro):      {recall_macro:.4f}")
+    print(f"F1-Score (Macro):    {f1_macro:.4f}")
+    print(f"Precision (Weighted): {precision_weighted:.4f}")
+    print(f"Recall (Weighted):    {recall_weighted:.4f}")
+    print(f"F1-Score (Weighted):  {f1_weighted:.4f}")
+
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred, zero_division=0))
+
+    print("Confusion Matrix:")
+    print(confusion_matrix(y_test, y_pred))
+
+    print("\n====================== DONE ======================\n")
 
 
 if __name__ == "__main__":

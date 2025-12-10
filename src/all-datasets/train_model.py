@@ -106,9 +106,9 @@ def main():
     print(confusion_matrix(y_test, y_pred))
 
     print_section("STEP 8 — Saving Final Model")
-    joblib.dump(model, "models/all-rf/model.pkl")
-    joblib.dump(scaler, "models/all-rf/scaler.pkl")
-    joblib.dump(encoder, "models/all-rf/label_encoder.pkl")
+    joblib.dump(model, "models/all/model.pkl")
+    joblib.dump(scaler, "models/all/scaler.pkl")
+    joblib.dump(encoder, "models/all/label_encoder.pkl")
 
     print("Model, scaler, and label encoder saved successfully.")
     print("\n====================== DONE ======================")

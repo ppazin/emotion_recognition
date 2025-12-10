@@ -13,13 +13,12 @@ MODEL_PATH = "models/all-rf/model.pkl"
 SCALER_PATH = "models/all-rf/scaler.pkl"
 ENCODER_PATH = "models/all-rf/label_encoder.pkl"
 
-# Map model labels -> nicer text + color (no emojis)
 EMOTION_STYLES = {
     "neutral":   {"label": "Neutralno",   "color": "#8c8c8c"},
     "calm":      {"label": "Smireno",    "color": "#52c41a"},
     "happy":     {"label": "Sretno",     "color": "#faad14"},
     "sad":       {"label": "Tužno",      "color": "#40a9ff"},
-    "angry":     {"label": "Ljutito",    "color": "#ff4d4f"},
+    "angry":     {"label": "Ljuto",    "color": "#ff4d4f"},
     "fearful":   {"label": "Uplašeno",   "color": "#722ed1"},
     "disgust":   {"label": "Gadljivo",   "color": "#13c2c2"},
     "surprised": {"label": "Iznenađeno", "color": "#eb2f96"},
@@ -237,7 +236,7 @@ def main():
                 except Exception as e:
                     st.error(f"Greška pri obradi audio datoteke: `{e}`")
         else:
-            st.info("Još nije učitan nijedan audio. Ispusti datoteku ili klikni za odabir.")
+            st.info("Još nije učitan nijedan zapis. Ispusti datoteku ili klikni za odabir.")
 
     with col_right:
         st.markdown("### Informacije o modelu")
@@ -249,7 +248,7 @@ def main():
                     <strong>Model</strong>
                 </p>
                 <ul style="margin-top: 0; padding-left: 1.1rem; font-size: 0.9rem;">
-                    <li>Korištene metode strojnog učenja: Random Forest + XGBoost</li>
+                    <li>Korištene metode strojnog učenja: XGBoost</li>
                     <li>Analizirane značajke:
                         <ul style="margin-top: 0.25rem; padding-left: 1.1rem;">
                             <li>MFCC, delta, delta-delta</li>
